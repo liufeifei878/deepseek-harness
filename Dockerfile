@@ -21,11 +21,6 @@ RUN test -n "$DSH_CLIENT_COMMIT_HASH" \
     && pnpm run build:artifacts \
     && pnpm run build:check \
     && pnpm --dir native/system run build:native
-# Pack the vendored overrides instead of retaining links into the build checkout.
-RUN --mount=type=cache,id=dsh-pnpm,target=/pnpm/store \
-    node -e 'const fs = require("node:fs"); const path = "pnpm-workspace.yaml"; fs.writeFileSync(path, fs.readFileSync(path, "utf8").replaceAll("link:vendor/", "file:vendor/"));' \
-    && pnpm --filter @deepseek-ai/dsh deploy --legacy --prod --store-dir /pnpm/store --config.allow-unused-patches=true /out
-RUN node docker/verify-deployment.mjs /out
 
 FROM node:24-bookworm-slim AS runtime
 RUN apt-get update \
@@ -40,8 +35,8 @@ ENV NODE_ENV=production \
     DSH_WEB_PORT=3080 \
     DSH_WEB_PUBLIC_URL=http://localhost:3080/ \
     DSH_TELEMETRY_DISABLED=1
-COPY --from=build /out /app
-COPY docker/*.mjs /opt/dsh-docker/
+COPY --from=build /app /app
+COPY docker/config.mjs docker/entrypoint.mjs docker/healthcheck.mjs /opt/dsh-docker/
 USER node
 WORKDIR /workspace
 EXPOSE 3080

@@ -2,4 +2,4 @@
 import { webConfig } from './config.mjs'
 
 const { args } = webConfig()
-process.execve(process.execPath, [process.execPath, '/app/lib/bin.js', ...args, ...process.argv.slice(2)], process.env)
+process.execve(process.execPath, [process.execPath, '/app/apps/cli/lib/bin.js', ...args, ...process.argv.slice(2)], process.env)

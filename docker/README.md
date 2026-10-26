@@ -50,6 +50,6 @@ docker build --build-arg DSH_CLIENT_COMMIT_HASH="$(git rev-parse HEAD)" -t deeps
 bash docker/smoke-test.sh deepseek-harness:local
 ```
 
-Dockerfile 使用锁文件安装依赖，执行上游 `build:artifacts`、`build:check` 和 Linux native 构建，再部署生产依赖到运行镜像。镜像包含 bash、Git、Python 3、ripgrep、bubblewrap 和 Landlock 二进制；模型工具的 Linux 沙箱能力仍取决于宿主机内核及容器策略。浏览器自动化、桌面 UI 和可选 Office 运行时不包含在本镜像中。
+Dockerfile 使用锁文件安装依赖，执行上游 `build:artifacts`、`build:check` 和 Linux native 构建，保留完整构建目录并通过官方 `dsh` Web 入口启动。镜像包含 bash、Git、Python 3、ripgrep、bubblewrap 和 Landlock 二进制；模型工具的 Linux 沙箱能力仍取决于宿主机内核及容器策略。镜像不包含图形桌面、浏览器二进制或桌面版完整工具环境。
 
 健康检查以未登录页面返回的 `401` 判断认证服务已启动；CI 另验证完整登录后的页面和 API。入口自动选择容器的具体 IPv4，因为上游禁止监听 `0.0.0.0`；需要固定绑定地址时可设置 `DSH_WEB_HOST`。遥测上传默认通过 `DSH_TELEMETRY_DISABLED=1` 关闭；上游独立的模型会话日志上传选项仍由 Web 设置控制。
