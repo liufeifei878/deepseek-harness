@@ -1,0 +1,17 @@
+services:
+  deepseek-harness:
+    image: ghcr.io/liufeifei878/deepseek-harness:latest
+    restart: unless-stopped
+    ports:
+      - "${DSH_BIND_ADDRESS:-127.0.0.1}:${DSH_PORT:-3080}:3080"
+    environment:
+      DSH_WEB_PUBLIC_URL: "${DSH_WEB_PUBLIC_URL:-http://localhost:3080/}"
+      DSH_WEB_TRUSTED_HOSTS: "${DSH_WEB_TRUSTED_HOSTS:-}"
+    volumes:
+      - dsh-data:/data
+      - dsh-workspace:/workspace
+    stop_grace_period: 15s
+
+volumes:
+  dsh-data:
+  dsh-workspace:
