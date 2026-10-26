@@ -79,6 +79,9 @@ for match in re.finditer(r"dsh web: (http://[^\s]+)", logs):
 sys.exit(1)
 PY
     then
+      binding=$(docker port "$container" 3080/tcp)
+      [[ $binding =~ ^127\.0\.0\.1:[0-9]+$ ]] || fail 'expected exactly one loopback port mapping'
+      base="http://$binding"
       return
     fi
     sleep 1
@@ -157,9 +160,6 @@ stop_gracefully() {
 }
 
 wait_ready
-binding=$(docker port "$container" 3080/tcp)
-[[ $binding =~ ^127\.0\.0\.1:[0-9]+$ ]] || fail 'expected exactly one loopback port mapping'
-base="http://$binding"
 request 401 unauthenticated /
 request 303 exchange "/?token=$(cat "$scratch/token")"
 python3 - "$scratch/exchange.headers" "$scratch/cookie" <<'PY'
