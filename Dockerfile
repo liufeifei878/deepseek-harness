@@ -21,8 +21,10 @@ RUN test -n "$DSH_CLIENT_COMMIT_HASH" \
     && pnpm run build:artifacts \
     && pnpm run build:check \
     && pnpm --dir native/system run build:native
+# Pack the vendored overrides instead of retaining links into the build checkout.
 RUN --mount=type=cache,id=dsh-pnpm,target=/pnpm/store \
-    pnpm --filter @deepseek-ai/dsh deploy --legacy --prod --store-dir /pnpm/store --config.allow-unused-patches=true /out
+    node -e 'const fs = require("node:fs"); const path = "pnpm-workspace.yaml"; fs.writeFileSync(path, fs.readFileSync(path, "utf8").replaceAll("link:vendor/", "file:vendor/"));' \
+    && pnpm --filter @deepseek-ai/dsh deploy --legacy --prod --store-dir /pnpm/store --config.allow-unused-patches=true /out
 RUN node docker/verify-deployment.mjs /out
 
 FROM node:24-bookworm-slim AS runtime
