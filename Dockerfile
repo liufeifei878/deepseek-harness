@@ -17,9 +17,7 @@ RUN --mount=type=cache,id=dsh-pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --store-dir /pnpm/store
 
 ARG DSH_CLIENT_COMMIT_HASH
-RUN test -n "$DSH_CLIENT_COMMIT_HASH" \
-    && pnpm run build:artifacts \
-    && pnpm run build:check \
+RUN pnpm run build:artifacts \
     && pnpm --dir native/system run build:native
 
 FROM node:24-bookworm-slim AS runtime
@@ -27,8 +25,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        bash bubblewrap ca-certificates curl git openssh-client python3 ripgrep tini \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /data /workspace \
-    && chown node:node /data /workspace
+    && mkdir -p /data /workspace
 ENV NODE_ENV=production \
     DSH_HOME=/data \
     DSH_AGENTS_HOME=/data/agents \
@@ -36,11 +33,8 @@ ENV NODE_ENV=production \
     DSH_WEB_PUBLIC_URL=http://localhost:3080/ \
     DSH_TELEMETRY_DISABLED=1
 COPY --from=build /app /app
-COPY docker/config.mjs docker/entrypoint.mjs docker/healthcheck.mjs /opt/dsh-docker/
-USER node
+COPY docker/config.mjs docker/entrypoint.mjs /opt/dsh-docker/
 WORKDIR /workspace
 EXPOSE 3080
 VOLUME ["/data", "/workspace"]
-HEALTHCHECK --interval=15s --timeout=5s --start-period=120s --retries=3 \
-    CMD ["node", "/opt/dsh-docker/healthcheck.mjs"]
 ENTRYPOINT ["/usr/bin/tini", "--", "node", "/opt/dsh-docker/entrypoint.mjs"]

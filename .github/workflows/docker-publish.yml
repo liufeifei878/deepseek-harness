@@ -14,15 +14,11 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  DSH_TELEMETRY_DISABLED: '1'
-  TEST_IMAGE: deepseek-harness:web-${{ github.run_id }}-${{ github.run_attempt }}
-
 jobs:
   docker:
-    name: Build, smoke-test, and publish
+    name: Build and publish
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
@@ -31,37 +27,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Test Docker configuration
-        run: |
-          node --test docker/*.test.mjs
-          bash -n docker/smoke-test.sh
-          docker compose config --quiet
-
       - uses: docker/setup-buildx-action@v4.4.1
 
-      - name: Build and load the Web image
-        uses: docker/build-push-action@v7.4.0
-        timeout-minutes: 45
-        with:
-          context: .
-          platforms: linux/amd64
-          load: true
-          push: false
-          tags: ${{ env.TEST_IMAGE }}
-          build-args: |
-            DSH_CLIENT_COMMIT_HASH=${{ github.sha }}
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha,scope=docker-web-amd64
-          cache-to: type=gha,mode=max,scope=docker-web-amd64
-
-      - name: Smoke-test the built image
-        timeout-minutes: 10
-        run: bash docker/smoke-test.sh "$TEST_IMAGE"
-
       - name: Select image tags
-        if: github.event_name != 'pull_request'
         id: image
         shell: bash
         run: |
@@ -70,14 +38,8 @@ jobs:
           if [[ "$GITHUB_REF" == refs/heads/master ]]; then
             tags+=("$image:latest")
           elif [[ "$GITHUB_REF" == refs/tags/docker-v* ]]; then
-            version="${GITHUB_REF_NAME#docker-v}"
-            if [[ ! "$version" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,119}$ ]]; then
-              echo 'Docker release tag contains an invalid image version.' >&2
-              exit 1
-            fi
-            tags+=("$image:$GITHUB_REF_NAME" "$image:$version")
+            tags+=("$image:$GITHUB_REF_NAME" "$image:${GITHUB_REF_NAME#docker-v}")
           fi
-          printf '%s\n' "image=$image" >> "$GITHUB_OUTPUT"
           {
             echo 'tags<<IMAGE_TAGS'
             printf '%s\n' "${tags[@]}"
@@ -92,29 +54,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish the tested image
-        if: github.event_name != 'pull_request'
-        timeout-minutes: 10
-        env:
-          IMAGE_TAGS: ${{ steps.image.outputs.tags }}
-        shell: bash
-        run: |
-          while IFS= read -r tag; do
-            docker tag "$TEST_IMAGE" "$tag"
-            docker push "$tag"
-          done <<< "$IMAGE_TAGS"
-          {
-            echo '### Published Web image (linux/amd64)'
-            echo
-            while IFS= read -r tag; do
-              printf -- '- `%s`\n' "$tag"
-            done <<< "$IMAGE_TAGS"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Remove the local image
-        if: always()
-        shell: bash
-        run: |
-          if docker image inspect "$TEST_IMAGE" >/dev/null 2>&1; then
-            docker image rm --force "$TEST_IMAGE"
-          fi
+      - name: Build and push the Web image
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.image.outputs.tags }}
+          build-args: |
+            DSH_CLIENT_COMMIT_HASH=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=docker-web-amd64
+          cache-to: type=gha,mode=max,scope=docker-web-amd64

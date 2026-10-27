@@ -1,6 +1,6 @@
 # Docker 部署 Web 版
 
-本 Fork 使用 GitHub Actions 构建 Linux amd64 镜像，并在启动、登录、API 和重启持久化测试通过后推送到 `ghcr.io/liufeifei878/deepseek-harness`。构建在 GitHub 的 Linux runner 上完成；使用镜像的机器只需要 Docker 和 Compose。
+本 Fork 使用 GitHub Actions 构建 Linux amd64 镜像，并直接推送到 `ghcr.io/liufeifei878/deepseek-harness`。CI 只安装依赖、执行上游 `build:artifacts` 和 Linux native 编译、构建并推送 Docker 镜像，不运行配置测试、`build:check`、smoke 测试或容器启动验证。构建在 GitHub 的 Linux runner 上完成；使用镜像的机器只需要 Docker 和 Compose。
 
 ## 启动
 
@@ -14,7 +14,7 @@ docker compose logs deepseek-harness
 
 打开日志中 `dsh web:` 后面带 `?token=` 的完整登录链接。默认地址是 `http://localhost:3080/`，仅映射到宿主机回环地址。该链接是登录凭据，请勿公开。模型 API Key 可以在 Web 界面配置，无需放入仓库或 CI secrets。
 
-容器以 UID/GID `1000:1000` 运行。`dsh-data` 保存会话、配置、凭据和共享 skills，`dsh-workspace` 保存工作文件；`docker compose down` 保留这两个卷，`docker compose down -v` 会删除它们。挂载现有工作目录时，用 `./projects:/workspace` 替换工作区卷，并确保 UID 1000 有写入权限。
+容器沿用 Node 基础镜像的默认用户 root，不要求把挂载目录的所有者改成 UID 1000。`dsh-data` 保存会话、配置、凭据和共享 skills，`dsh-workspace` 保存工作文件；`docker compose down` 保留这两个卷，`docker compose down -v` 会删除它们。挂载现有工作目录时，用 `./projects:/workspace` 替换工作区卷。
 
 如果 GHCR 提示需要认证，先使用具有 `read:packages` 权限的 GitHub token 登录 `ghcr.io`，或者由仓库所有者在 GitHub 包设置中将包可见性改为 Public。
 
@@ -36,7 +36,7 @@ DSH_WEB_PUBLIC_URL=https://agent.example.com/
 
 ## 更新与构建
 
-推送到 `master` 会发布 `latest` 和 `sha-<完整提交号>`；推送 `docker-v1.0.0` 这样的 tag 会发布 `docker-v1.0.0`、`1.0.0` 和提交号标签。Actions 页面也支持手动运行。PR 只构建和测试，不发布。
+推送到 `master` 会发布 `latest` 和 `sha-<完整提交号>`；推送 `docker-v1.0.0` 这样的 tag 会发布 `docker-v1.0.0`、`1.0.0` 和提交号标签。Actions 页面也支持手动运行。PR 只构建，不发布。
 
 ```sh
 docker compose pull
@@ -47,9 +47,8 @@ docker compose up -d
 
 ```sh
 docker build --build-arg DSH_CLIENT_COMMIT_HASH="$(git rev-parse HEAD)" -t deepseek-harness:local .
-bash docker/smoke-test.sh deepseek-harness:local
 ```
 
-Dockerfile 使用锁文件安装依赖，执行上游 `build:artifacts`、`build:check` 和 Linux native 构建，保留完整构建目录并通过官方 `dsh` Web 入口启动。镜像包含 bash、Git、Python 3、ripgrep、bubblewrap 和 Landlock 二进制；模型工具的 Linux 沙箱能力仍取决于宿主机内核及容器策略。镜像不包含图形桌面、浏览器二进制或桌面版完整工具环境。
+Dockerfile 使用锁文件安装依赖，执行上游 `build:artifacts` 和 Linux native 构建，保留完整构建目录并通过官方 `dsh` Web 入口启动。镜像包含 bash、Git、Python 3、ripgrep、bubblewrap 和 Landlock 二进制；模型工具的 Linux 沙箱能力仍取决于宿主机内核及容器策略。镜像不包含图形桌面、浏览器二进制或桌面版完整工具环境。
 
-健康检查以未登录页面返回的 `401` 判断认证服务已启动；CI 另验证完整登录后的页面和 API。入口自动选择容器的具体 IPv4，因为上游禁止监听 `0.0.0.0`；需要固定绑定地址时可设置 `DSH_WEB_HOST`。遥测上传默认通过 `DSH_TELEMETRY_DISABLED=1` 关闭；上游独立的模型会话日志上传选项仍由 Web 设置控制。
+入口自动选择容器的具体 IPv4，因为上游禁止监听 `0.0.0.0`；需要固定绑定地址时可设置 `DSH_WEB_HOST`。遥测上传默认通过 `DSH_TELEMETRY_DISABLED=1` 关闭；上游独立的模型会话日志上传选项仍由 Web 设置控制。
