@@ -49,6 +49,6 @@ docker compose up -d
 docker build --build-arg DSH_CLIENT_COMMIT_HASH="$(git rev-parse HEAD)" -t deepseek-harness:local .
 ```
 
-Dockerfile 使用锁文件安装依赖，执行上游 `build:artifacts` 和 Linux native 构建，保留完整构建目录并通过官方 `dsh` Web 入口启动。镜像包含 bash、Git、Python 3、ripgrep、bubblewrap 和 Landlock 二进制；模型工具的 Linux 沙箱能力仍取决于宿主机内核及容器策略。镜像不包含图形桌面、浏览器二进制或桌面版完整工具环境。
+Dockerfile 使用锁文件安装依赖，执行上游 `build:artifacts` 和 Linux native 构建，并通过官方 `dsh` Web 入口启动。运行镜像继承完整构建环境，保留 Node.js、npm、项目指定版本的 pnpm、编译工具以及全部项目依赖、源码和构建产物，供运行时查询和安装插件使用。镜像还包含 bash、Git、Python 3、ripgrep、bubblewrap 和 Landlock 二进制；模型工具的 Linux 沙箱能力仍取决于宿主机内核及容器策略。镜像不包含图形桌面、浏览器二进制或桌面版完整工具环境。
 
 入口自动选择容器的具体 IPv4，因为上游禁止监听 `0.0.0.0`；需要固定绑定地址时可设置 `DSH_WEB_HOST`。遥测上传默认通过 `DSH_TELEMETRY_DISABLED=1` 关闭；上游独立的模型会话日志上传选项仍由 Web 设置控制。
